@@ -6,10 +6,12 @@ import { TerrainLayer } from "./terrainLayer.js";
 import { BuildingsLayer } from "./buildingsLayer.js";
 import { ProgressLayer } from "./progressLayer.js";
 import { VillagerManager } from "./villagerManager.js";
+import { SmokeLayer } from "./smokeLayer.js";
 import { Camera } from "./camera.js";
 import { PlacementController } from "./placementController.js";
 import { tileToScene, sceneToTile } from "./iso.js";
 import { CLIENT_BUILDINGS } from "./buildingCatalog.js";
+import type { Season } from "./palette.js";
 
 /**
  * The settlement scene: a world container (moved by the camera) holding the static terrain layer,
@@ -22,6 +24,7 @@ export class SettlementScene {
   private readonly buildingsLayer = new BuildingsLayer();
   private readonly progressLayer = new ProgressLayer();
   readonly villagers = new VillagerManager();
+  private readonly smoke = new SmokeLayer();
   private readonly camera: Camera;
   readonly placement: PlacementController;
   private terrainRendered = false;
@@ -37,6 +40,7 @@ export class SettlementScene {
     this.world.addChild(this.terrainLayer.graphics);
     this.world.addChild(this.buildingsLayer.container);
     this.world.addChild(this.villagers.container);
+    this.world.addChild(this.smoke.container);
     this.world.addChild(this.progressLayer.container);
     this.app.stage.addChild(this.world);
 
@@ -45,9 +49,11 @@ export class SettlementScene {
 
     this.store.subscribe(() => this.syncFromStore());
     this.app.ticker.add((ticker) => {
+      const dt = ticker.deltaMS / 1000;
       this.camera.update();
       this.progressLayer.update();
-      this.villagers.update(ticker.deltaMS / 1000, Date.now());
+      this.villagers.update(dt, Date.now());
+      this.smoke.update(dt);
     });
     this.attachPicking();
   }
@@ -89,16 +95,21 @@ export class SettlementScene {
   }
 
   private syncFromStore(): void {
-    const { terrain, settlement, serverTime } = this.store;
-    if (terrain && !this.terrainRendered) {
-      this.terrainLayer.render(terrain);
-      this.terrainRendered = true;
-      const mid = tileToScene(terrain.size / 2, terrain.size / 2);
-      this.camera.centerOn(mid.x, mid.y);
+    const { terrain, settlement, serverTime, season } = this.store;
+    if (terrain) {
+      // TerrainLayer self-guards; re-renders only when terrain or season actually changes.
+      this.terrainLayer.render(terrain, season as Season);
+      if (!this.terrainRendered) {
+        this.terrainRendered = true;
+        const mid = tileToScene(terrain.size / 2, terrain.size / 2);
+        this.camera.centerOn(mid.x, mid.y);
+      }
     }
     if (settlement) {
       this.buildingsLayer.render(settlement.buildings, serverTime);
       this.progressLayer.setBuildings(settlement.buildings);
+      this.smoke.setBuildings(settlement.buildings, serverTime);
+      this.smoke.setSeason(season);
       if (terrain) this.villagers.sync(settlement, terrain, Date.now());
     }
   }

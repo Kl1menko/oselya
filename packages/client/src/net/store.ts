@@ -43,4 +43,10 @@ export class GameStore {
     this.serverTime = delta.serverTime;
     this.emit();
   }
+
+  /** Dev-only: force a season locally to preview seasonal visuals without waiting days. */
+  debugSetSeason(season: string): void {
+    this.season = season;
+    this.emit();
+  }
 }
