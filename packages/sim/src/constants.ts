@@ -33,6 +33,29 @@ export type ResourceType = (typeof RESOURCES)[number];
 /** New-player shield: full immunity on spawn (AGENT.md §3.3). */
 export const NEWBIE_SHIELD_MS = 72 * 60 * 60 * 1_000; // 72h
 
+/** Settlement grid: 64×64 isometric tiles (AGENT.md §3.2). */
+export const GRID_SIZE = 64;
+
+/** Base storage capacity per resource before warehouse/town-hall bonuses. */
+export const BASE_STORAGE = 300;
+
+/** Resources exempt from the storage cap (soft currencies). */
+export const UNCAPPED_RESOURCES: readonly ResourceType[] = ["gold"];
+
+/** Population per house is defined on the house building; this is the starting free pop. */
+export const STARTING_POPULATION = 4;
+
+/** Winter: farms stop producing food and heating consumes extra wood (AGENT.md §3.2). */
+export const WINTER = {
+  /** Multiplier on food output from farms in winter (fishing still works). */
+  farmFoodMultiplier: 0,
+  /** Extra wood consumed per hour per house for heating. */
+  heatingWoodPerHousePerHour: 5,
+} as const;
+
+/** Milliseconds per hour — production rates in the building catalog are per-hour. */
+export const MS_PER_HOUR = 60 * 60 * 1_000;
+
 /**
  * Given absolute world time elapsed since season 0, return the current season.
  * Pure + deterministic — safe for catch-up simulation.
