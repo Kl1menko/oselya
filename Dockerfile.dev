@@ -1,0 +1,19 @@
+# Shared dev image for server + client. Source is bind-mounted by docker-compose;
+# node_modules lives in an anonymous volume so host/container arches don't clash.
+FROM node:22-slim
+
+RUN corepack enable
+
+WORKDIR /app
+
+# Copy manifests first for layer caching. Actual install runs at container start (see compose
+# command) so a fresh clone works without a prior host-side `pnpm install`.
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/sim/package.json packages/sim/
+COPY packages/server/package.json packages/server/
+COPY packages/client/package.json packages/client/
+
+RUN pnpm install --frozen-lockfile || pnpm install
+
+COPY . .

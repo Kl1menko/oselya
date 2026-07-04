@@ -1,0 +1,36 @@
+{
+  "name": "oselya",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Oselya — persistent browser MMO strategy (settlement + world map).",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:server": "pnpm --filter @oselya/server dev",
+    "dev:client": "pnpm --filter @oselya/client dev",
+    "db:generate": "pnpm --filter @oselya/server db:generate",
+    "db:migrate": "pnpm --filter @oselya/server db:migrate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.11.1",
+    "@types/node": "^22.7.4",
+    "@typescript-eslint/eslint-plugin": "^8.8.0",
+    "@typescript-eslint/parser": "^8.8.0",
+    "eslint": "^9.11.1",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.11.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.2",
+    "vitest": "^2.1.1"
+  }
+}

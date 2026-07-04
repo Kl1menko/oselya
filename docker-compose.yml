@@ -1,0 +1,70 @@
+# Phase 0: `docker compose up --build` brings up postgres + redis + server + client.
+# Server auto-migrates then starts (tsx watch); client runs vite dev.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oselya
+      POSTGRES_PASSWORD: oselya
+      POSTGRES_DB: oselya
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oselya -d oselya"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: sh -c "pnpm install && pnpm db:migrate && pnpm dev:server"
+    environment:
+      NODE_ENV: development
+      SERVER_PORT: "8080"
+      AUTH_DEV_AUTOLOGIN: "true"
+      DATABASE_URL: postgres://oselya:oselya@postgres:5432/oselya
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: sh -c "pnpm install && pnpm dev:client"
+    environment:
+      VITE_WS_URL: ws://localhost:8080
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+
+volumes:
+  pgdata:
+  node_modules:
