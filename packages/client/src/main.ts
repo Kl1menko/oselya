@@ -4,6 +4,9 @@ import { WsClient } from "./net/wsClient.js";
 import { GameStore } from "./net/store.js";
 import { SettlementScene } from "./scenes/settlement/settlementScene.js";
 import { StatusBar } from "./ui/statusBar.js";
+import { ResourceBar } from "./ui/resourceBar.js";
+import { BuildPanel } from "./ui/buildPanel.js";
+import { BuildingPanel } from "./ui/buildingPanel.js";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080";
 
@@ -18,11 +21,9 @@ async function boot(): Promise<void> {
   });
   const mount = document.getElementById("app")!;
   mount.appendChild(app.canvas);
-  // The canvas must receive pointer events for the camera.
   app.canvas.style.touchAction = "none";
 
   const store = new GameStore();
-  new SettlementScene(app, store);
 
   const status = new StatusBar();
   const client = new WsClient(WS_URL, "dev", {
@@ -35,6 +36,22 @@ async function boot(): Promise<void> {
     },
     onDelta: (delta) => store.applyDelta(delta),
     onRejected: (r) => console.warn("command rejected:", r.reason),
+  });
+
+  const scene = new SettlementScene(app, store, client);
+
+  // UI overlays.
+  new ResourceBar(store);
+  const buildingPanel = new BuildingPanel(store, client);
+  const buildPanel = new BuildPanel((type) => {
+    scene.placement.select(type);
+    if (type) buildingPanel.select(null); // entering build mode closes the inspect panel
+  });
+
+  // Selecting a building opens its inspect panel; entering build mode clears its highlight.
+  scene.onBuildingClick = (id) => buildingPanel.select(id);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") buildPanel.clearSelection();
   });
 
   client.subscribe("settlement");
