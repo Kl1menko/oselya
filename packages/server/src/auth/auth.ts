@@ -30,22 +30,42 @@ export async function authenticate(token: string): Promise<AuthedIdentity | null
   return null;
 }
 
-/** Ensure the singleton dev world exists, returning its id and seed. */
-async function getOrCreateDevWorld(): Promise<{ id: string }> {
+export interface DevWorld {
+  id: string;
+  seed: number;
+  /** Absolute ms at which season 0 (spring) began. */
+  seasonStartedAt: number;
+}
+
+/** Ensure the singleton dev world exists, returning its id, seed and season epoch. */
+export async function getOrCreateDevWorld(): Promise<DevWorld> {
   const existing = await db
-    .select({ id: schema.worlds.id })
+    .select({
+      id: schema.worlds.id,
+      seed: schema.worlds.seed,
+      seasonStartedAt: schema.worlds.seasonStartedAt,
+    })
     .from(schema.worlds)
     .where(eq(schema.worlds.name, DEV_WORLD_NAME))
     .limit(1);
-  if (existing[0]) return existing[0];
+  if (existing[0]) {
+    return {
+      id: existing[0].id,
+      seed: existing[0].seed,
+      seasonStartedAt: existing[0].seasonStartedAt.getTime(),
+    };
+  }
 
   const seed = deriveSeed(1, DEV_WORLD_NAME);
   const [world] = await db
     .insert(schema.worlds)
     .values({ name: DEV_WORLD_NAME, seed, status: "running" })
-    .returning({ id: schema.worlds.id });
+    .returning({
+      id: schema.worlds.id,
+      seasonStartedAt: schema.worlds.seasonStartedAt,
+    });
   logger.info({ worldId: world!.id, seed }, "created dev world");
-  return world!;
+  return { id: world!.id, seed, seasonStartedAt: world!.seasonStartedAt.getTime() };
 }
 
 async function getOrCreateDevIdentity(): Promise<AuthedIdentity> {

@@ -8,13 +8,21 @@ import {
   type SnapshotPayload,
   type CmdRejectedPayload,
   type SubScope,
+  type SettlementSnapshotState,
 } from "@oselya/shared";
 import { authenticate } from "../auth/auth.js";
 import { logger } from "../logger.js";
 import type { Connection } from "./connection.js";
+import type { ServerContext } from "./context.js";
+import { handleBuildPlace, handleBuildDemolish } from "../commands/build.js";
+import { handleWorkAssign } from "../commands/work.js";
 
 /** Parse + route one raw ws message. All validation happens here (server is authoritative). */
-export async function handleMessage(conn: Connection, raw: string): Promise<void> {
+export async function handleMessage(
+  conn: Connection,
+  raw: string,
+  ctx: ServerContext,
+): Promise<void> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -29,9 +37,10 @@ export async function handleMessage(conn: Connection, raw: string): Promise<void
     return;
   }
   const { t, seq, d } = env.data;
+  const now = Date.now();
 
   // Rate limit everything except the initial auth handshake.
-  if (t !== ClientMessageType.Auth && !conn.allowCommand(Date.now())) {
+  if (t !== ClientMessageType.Auth && !conn.allowCommand(now)) {
     reject(conn, seq, "rate_limited");
     return;
   }
@@ -44,10 +53,31 @@ export async function handleMessage(conn: Connection, raw: string): Promise<void
       handlePing(conn, seq, d);
       return;
     case ClientMessageType.Sub:
-      if (requireAuth(conn, seq)) handleSub(conn, seq, d);
+      if (requireAuth(conn, seq)) handleSub(conn, seq, d, ctx, now);
       return;
+    case ClientMessageType.BuildPlace: {
+      if (!requireAuth(conn, seq)) return;
+      const p = clientPayloadSchemas[ClientMessageType.BuildPlace].safeParse(d);
+      if (!p.success) return reject(conn, seq, "invalid_payload");
+      handleBuildPlace(conn, seq, p.data, ctx, now);
+      return;
+    }
+    case ClientMessageType.BuildDemolish: {
+      if (!requireAuth(conn, seq)) return;
+      const p = clientPayloadSchemas[ClientMessageType.BuildDemolish].safeParse(d);
+      if (!p.success) return reject(conn, seq, "invalid_payload");
+      handleBuildDemolish(conn, seq, p.data, ctx, now);
+      return;
+    }
+    case ClientMessageType.WorkAssign: {
+      if (!requireAuth(conn, seq)) return;
+      const p = clientPayloadSchemas[ClientMessageType.WorkAssign].safeParse(d);
+      if (!p.success) return reject(conn, seq, "invalid_payload");
+      handleWorkAssign(conn, seq, p.data, ctx, now);
+      return;
+    }
     default:
-      // Declared-but-unimplemented commands (build.*, army.*, trade.*, chat.*) land in later phases.
+      // Declared-but-unimplemented commands (army.*, trade.*, chat.*) land in later phases.
       reject(conn, seq, `unimplemented:${t}`);
       return;
   }
@@ -83,7 +113,13 @@ function handlePing(conn: Connection, seq: number, d: unknown): void {
   conn.send<PongPayload>(ServerMessageType.Pong, seq, { ts: clientTs, serverTs: Date.now() });
 }
 
-function handleSub(conn: Connection, seq: number, d: unknown): void {
+function handleSub(
+  conn: Connection,
+  seq: number,
+  d: unknown,
+  ctx: ServerContext,
+  now: number,
+): void {
   const payload = clientPayloadSchemas[ClientMessageType.Sub].safeParse(d);
   if (!payload.success) {
     reject(conn, seq, "invalid_sub_payload");
@@ -91,10 +127,26 @@ function handleSub(conn: Connection, seq: number, d: unknown): void {
   }
   const scope: SubScope = payload.data.scope;
   conn.subscriptions.add(scope);
-  // Phase 0 snapshot is a stub; Phase 1 fills settlement state, Phase 2 world state.
+
+  if (scope === "settlement") {
+    const settlement = ctx.settlements.getOrCreate(conn.identity!.playerId);
+    const state: SettlementSnapshotState = {
+      settlement: settlement.toWire(now),
+      season: settlement.season(now, ctx.seasonEpoch),
+      seasonEpoch: ctx.seasonEpoch,
+    };
+    conn.send<SnapshotPayload>(ServerMessageType.Snapshot, seq, {
+      scope,
+      serverTime: now,
+      state,
+    });
+    return;
+  }
+
+  // World scope: real state lands in Phase 2.
   conn.send<SnapshotPayload>(ServerMessageType.Snapshot, seq, {
     scope,
-    serverTime: Date.now(),
+    serverTime: now,
     state: {},
   });
 }

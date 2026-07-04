@@ -21,9 +21,9 @@ Every message is `{ "t": <type>, "seq": <number>, "d": <payload> }`.
 | `auth`              | `{ token }`                                 | ✅ Phase 0 |
 | `sub`               | `{ scope: "settlement" \| "world", area? }` | ✅ Phase 0 |
 | `ping`              | `{ ts }`                                    | ✅ Phase 0 |
-| `build.place`       | `{ buildingType, x, y }`                    | ⏳ Phase 1 |
-| `build.demolish`    | `{ buildingId }`                            | ⏳ Phase 1 |
-| `work.assign`       | `{ buildingId, workers }`                   | ⏳ Phase 1 |
+| `build.place`       | `{ buildingType, x, y }`                    | ✅ Phase 1 |
+| `build.demolish`    | `{ buildingId }`                            | ✅ Phase 1 |
+| `work.assign`       | `{ buildingId, workers }`                   | ✅ Phase 1 |
 | `army.recruit`      | `{ unitType, count }`                       | ⏳ Phase 3 |
 | `army.move`         | `{ armyId, targetHex }`                     | ⏳ Phase 3 |
 | `trade.createOffer` | `{ give, want }`                            | ⏳ Phase 2 |
@@ -37,16 +37,16 @@ Rate limit: **20 commands / 10 s** per connection (`auth` is exempt).
 
 ## Server → client
 
-| type            | payload                          | status                       |
-| --------------- | -------------------------------- | ---------------------------- |
-| `authed`        | `{ playerId, userId, worldId }`  | ✅ Phase 0                   |
-| `snapshot`      | `{ scope, serverTime, state }`   | ✅ Phase 0 (state is a stub) |
-| `pong`          | `{ ts, serverTs }`               | ✅ Phase 0                   |
-| `cmd.rejected`  | `{ seq, reason }`                | ✅ Phase 0                   |
-| `delta`         | changed entities since last tick | ⏳ Phase 1                   |
-| `notify`        | `{ level, text }`                | ⏳ Phase 1                   |
-| `battle.report` | battle breakdown                 | ⏳ Phase 3                   |
-| `chat.msg`      | chat message                     | ⏳ Phase 2                   |
+| type            | payload                                | status                        |
+| --------------- | -------------------------------------- | ----------------------------- |
+| `authed`        | `{ playerId, userId, worldId }`        | ✅ Phase 0                    |
+| `snapshot`      | `{ scope, serverTime, state }`         | ✅ settlement state (Phase 1) |
+| `pong`          | `{ ts, serverTs }`                     | ✅ Phase 0                    |
+| `cmd.rejected`  | `{ seq, reason }`                      | ✅ Phase 0                    |
+| `delta`         | `{ serverTime, season?, settlement? }` | ✅ Phase 1 (whole-settlement) |
+| `notify`        | `{ level, text }`                      | ⏳ Phase 1                    |
+| `battle.report` | battle breakdown                       | ⏳ Phase 3                    |
+| `chat.msg`      | chat message                           | ⏳ Phase 2                    |
 
 ## Handshake & resync
 

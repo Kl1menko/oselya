@@ -7,14 +7,24 @@ import { handleMessage } from "./world/router.js";
 import { TickLoop } from "./world/tickLoop.js";
 import { SnapshotWriter } from "./persistence/snapshotWriter.js";
 import { client as dbClient } from "./persistence/db.js";
+import { SettlementRegistry } from "./world/settlementRegistry.js";
+import type { ServerContext } from "./world/context.js";
+import { getOrCreateDevWorld } from "./auth/auth.js";
 
 const HEARTBEAT_INTERVAL_MS = 30_000;
 
-function main(): void {
+async function main(): Promise<void> {
+  // Load the world so the sim context has its seed + season epoch (AGENT.md §4.2).
+  const world = await getOrCreateDevWorld();
+  const ctx: ServerContext = {
+    settlements: new SettlementRegistry(world.seed),
+    seasonEpoch: world.seasonStartedAt,
+  };
+
   const wss = new WebSocketServer({ port: config.serverPort });
   const connections = new Map<string, Connection>();
 
-  const tickLoop = new TickLoop();
+  const tickLoop = new TickLoop(ctx, connections);
   const snapshotWriter = new SnapshotWriter();
 
   wss.on("connection", (ws) => {
@@ -23,7 +33,7 @@ function main(): void {
     logger.info({ connId: conn.id, total: connections.size }, "connection opened");
 
     ws.on("message", (data) => {
-      void handleMessage(conn, data.toString()).catch((err) => {
+      void handleMessage(conn, data.toString(), ctx).catch((err) => {
         logger.error({ err, connId: conn.id }, "message handler error");
       });
     });
@@ -80,4 +90,7 @@ function main(): void {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
 }
 
-main();
+main().catch((err) => {
+  logger.error(err, "fatal startup error");
+  process.exit(1);
+});

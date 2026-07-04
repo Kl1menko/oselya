@@ -64,6 +64,26 @@ export const pingPayload = z.object({
 });
 export type PingPayload = z.infer<typeof pingPayload>;
 
+// build.place — buildingType is validated for shape here; the server checks it against the
+// sim building catalog (shared must not depend on @oselya/sim).
+export const buildPlacePayload = z.object({
+  buildingType: z.string().min(1),
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+});
+export type BuildPlacePayload = z.infer<typeof buildPlacePayload>;
+
+export const buildDemolishPayload = z.object({
+  buildingId: z.string().min(1),
+});
+export type BuildDemolishPayload = z.infer<typeof buildDemolishPayload>;
+
+export const workAssignPayload = z.object({
+  buildingId: z.string().min(1),
+  workers: z.number().int().nonnegative(),
+});
+export type WorkAssignPayload = z.infer<typeof workAssignPayload>;
+
 /**
  * Registry of validators for implemented commands. Command handlers look the schema up here
  * rather than importing each individually. Unimplemented types are absent → rejected.
@@ -72,6 +92,9 @@ export const clientPayloadSchemas = {
   [ClientMessageType.Auth]: authPayload,
   [ClientMessageType.Sub]: subPayload,
   [ClientMessageType.Ping]: pingPayload,
+  [ClientMessageType.BuildPlace]: buildPlacePayload,
+  [ClientMessageType.BuildDemolish]: buildDemolishPayload,
+  [ClientMessageType.WorkAssign]: workAssignPayload,
 } as const;
 
 // ---- Server → client payload types ----
@@ -99,10 +122,54 @@ export interface NotifyPayload {
   text: string;
 }
 
-/** Phase 0 snapshot is intentionally thin — expands in Phase 1. */
+// ---- Settlement wire types (Phase 1) ----
+// These mirror the sim's shapes but live in shared so the client can type them without
+// importing @oselya/sim. The 8 resource keys and building type strings are validated on the
+// server against the sim catalog.
+
+export type WireResources = Record<string, number>;
+
+export interface WireBuilding {
+  id: string;
+  type: string;
+  level: number;
+  x: number;
+  y: number;
+  workers: number;
+  /** Absolute ms when construction completes; <= serverTime means operational. */
+  constructionEndsAt: number;
+}
+
+export interface WireSettlement {
+  gridSeed: number;
+  townHallLevel: number;
+  population: number;
+  populationCap: number;
+  happiness: number;
+  resources: WireResources;
+  buildings: WireBuilding[];
+}
+
+export interface SettlementSnapshotState {
+  settlement: WireSettlement;
+  season: string;
+  /** Absolute ms at which season 0 (spring) began — lets the client compute the season clock. */
+  seasonEpoch: number;
+}
+
 export interface SnapshotPayload {
   scope: SubScope;
   serverTime: number;
-  /** Filled in with settlement / world state in later phases. */
-  state: Record<string, unknown>;
+  /** For scope "settlement" this is a SettlementSnapshotState; world scope lands in Phase 2. */
+  state: SettlementSnapshotState | Record<string, unknown>;
+}
+
+/**
+ * Delta after a tick or a command: only changed fields. Phase 1 sends the whole settlement when
+ * anything changes (simplest correct thing); field-level diffing is a later optimization.
+ */
+export interface DeltaPayload {
+  serverTime: number;
+  season?: string;
+  settlement?: WireSettlement;
 }
