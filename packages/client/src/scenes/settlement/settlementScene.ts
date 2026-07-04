@@ -5,6 +5,7 @@ import type { WsClient } from "../../net/wsClient.js";
 import { TerrainLayer } from "./terrainLayer.js";
 import { BuildingsLayer } from "./buildingsLayer.js";
 import { ProgressLayer } from "./progressLayer.js";
+import { VillagerManager } from "./villagerManager.js";
 import { Camera } from "./camera.js";
 import { PlacementController } from "./placementController.js";
 import { tileToScene, sceneToTile } from "./iso.js";
@@ -20,6 +21,7 @@ export class SettlementScene {
   private readonly terrainLayer = new TerrainLayer();
   private readonly buildingsLayer = new BuildingsLayer();
   private readonly progressLayer = new ProgressLayer();
+  readonly villagers = new VillagerManager();
   private readonly camera: Camera;
   readonly placement: PlacementController;
   private terrainRendered = false;
@@ -34,6 +36,7 @@ export class SettlementScene {
   ) {
     this.world.addChild(this.terrainLayer.graphics);
     this.world.addChild(this.buildingsLayer.container);
+    this.world.addChild(this.villagers.container);
     this.world.addChild(this.progressLayer.container);
     this.app.stage.addChild(this.world);
 
@@ -41,9 +44,10 @@ export class SettlementScene {
     this.placement = new PlacementController(this.app, this.world, this.store, client);
 
     this.store.subscribe(() => this.syncFromStore());
-    this.app.ticker.add(() => {
+    this.app.ticker.add((ticker) => {
       this.camera.update();
       this.progressLayer.update();
+      this.villagers.update(ticker.deltaMS / 1000, Date.now());
     });
     this.attachPicking();
   }
@@ -95,6 +99,7 @@ export class SettlementScene {
     if (settlement) {
       this.buildingsLayer.render(settlement.buildings, serverTime);
       this.progressLayer.setBuildings(settlement.buildings);
+      if (terrain) this.villagers.sync(settlement, terrain, Date.now());
     }
   }
 }

@@ -40,6 +40,11 @@ async function boot(): Promise<void> {
 
   const scene = new SettlementScene(app, store, client);
 
+  // Dev-only debug handle (used by automated tests to verify the villager walk cycle).
+  if (import.meta.env.DEV) {
+    (window as unknown as { __oselya?: unknown }).__oselya = { app, store, scene };
+  }
+
   // UI overlays.
   new ResourceBar(store);
   const buildingPanel = new BuildingPanel(store, client);
