@@ -40,7 +40,8 @@ services:
       DATABASE_URL: postgres://oselya:oselya@postgres:5432/oselya
       REDIS_URL: redis://redis:6379
     ports:
-      - "8080:8080"
+      # Host 8090 → container 8080 (8080 is often taken by other local dev servers).
+      - "8090:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,7 +57,7 @@ services:
       dockerfile: Dockerfile.dev
     command: sh -c "pnpm install && pnpm dev:client"
     environment:
-      VITE_WS_URL: ws://localhost:8080
+      VITE_WS_URL: ws://localhost:8090
     ports:
       - "5173:5173"
     depends_on:
