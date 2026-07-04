@@ -150,8 +150,19 @@ export interface WireSettlement {
   buildings: WireBuilding[];
 }
 
+/**
+ * Terrain sent once in the settlement snapshot (it never changes, so it's not in deltas).
+ * `tiles` is a compact string, one char per tile, row-major, length = size*size:
+ *   g=grass, f=forest, s=stone, i=iron, w=water. The server generates it; the client only renders.
+ */
+export interface WireTerrain {
+  size: number;
+  tiles: string;
+}
+
 export interface SettlementSnapshotState {
   settlement: WireSettlement;
+  terrain: WireTerrain;
   season: string;
   /** Absolute ms at which season 0 (spring) began — lets the client compute the season clock. */
   seasonEpoch: number;

@@ -6,6 +6,8 @@ import {
   type AuthedPayload,
   type PongPayload,
   type SnapshotPayload,
+  type DeltaPayload,
+  type CmdRejectedPayload,
   type SubScope,
 } from "@oselya/shared";
 
@@ -15,6 +17,8 @@ export interface WsClientEvents {
   onState?: (state: ConnState) => void;
   onAuthed?: (identity: AuthedPayload) => void;
   onSnapshot?: (snapshot: SnapshotPayload) => void;
+  onDelta?: (delta: DeltaPayload) => void;
+  onRejected?: (r: CmdRejectedPayload) => void;
   onPong?: (rttMs: number) => void;
 }
 
@@ -101,15 +105,26 @@ export class WsClient {
       case ServerMessageType.Snapshot:
         this.events.onSnapshot?.(env.d as SnapshotPayload);
         break;
+      case ServerMessageType.Delta:
+        this.events.onDelta?.(env.d as DeltaPayload);
+        break;
+      case ServerMessageType.CmdRejected:
+        this.events.onRejected?.(env.d as CmdRejectedPayload);
+        break;
       case ServerMessageType.Pong: {
         const d = env.d as PongPayload;
         this.events.onPong?.(Date.now() - d.ts);
         break;
       }
       default:
-        // delta / notify / chat / cmd.rejected — handled in later phases.
+        // notify / chat — handled in later phases.
         break;
     }
+  }
+
+  /** Send a validated command to the server (fire-and-forget; result arrives as delta/reject). */
+  command<D>(type: ClientMessageType, payload: D): void {
+    this.send(type, payload);
   }
 
   private sendSub(scope: SubScope): void {

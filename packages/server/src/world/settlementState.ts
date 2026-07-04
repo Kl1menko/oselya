@@ -19,7 +19,17 @@ import {
   type TerrainMap,
   type PlacementError,
 } from "@oselya/sim";
-import type { WireBuilding, WireSettlement } from "@oselya/shared";
+import type { WireBuilding, WireSettlement, WireTerrain } from "@oselya/shared";
+import type { TerrainType } from "@oselya/sim";
+
+/** Compact one-char encoding for terrain tiles sent to the client. */
+const TERRAIN_CODE: Record<TerrainType, string> = {
+  grass: "g",
+  forest: "f",
+  stone: "s",
+  iron: "i",
+  water: "w",
+};
 
 export interface ServerBuilding extends SimBuilding {
   x: number;
@@ -156,6 +166,13 @@ export class SettlementState {
   /** View for the pure sim (economy/catch-up). */
   toSim(): SimSettlement {
     return { buildings: this.buildings, resources: this.resources };
+  }
+
+  /** Terrain encoded for the wire (sent once in the snapshot). */
+  toWireTerrain(): WireTerrain {
+    let tiles = "";
+    for (const t of this.terrain.tiles) tiles += TERRAIN_CODE[t];
+    return { size: this.terrain.size, tiles };
   }
 
   season(now: number, seasonEpoch: number) {

@@ -132,6 +132,7 @@ function handleSub(
     const settlement = ctx.settlements.getOrCreate(conn.identity!.playerId);
     const state: SettlementSnapshotState = {
       settlement: settlement.toWire(now),
+      terrain: settlement.toWireTerrain(),
       season: settlement.season(now, ctx.seasonEpoch),
       seasonEpoch: ctx.seasonEpoch,
     };
