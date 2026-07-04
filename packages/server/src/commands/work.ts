@@ -12,7 +12,11 @@ export function handleWorkAssign(
   now: number,
 ): void {
   const playerId = conn.identity!.playerId;
-  const settlement = ctx.settlements.getOrCreate(playerId);
+  const settlement = ctx.settlements.get(playerId);
+  if (!settlement) {
+    rejectCmd(conn, seq, "settlement_not_loaded");
+    return;
+  }
 
   const result = settlement.assignWorkers(payload.buildingId, payload.workers);
   if ("error" in result) {

@@ -5,8 +5,10 @@ import {
   timestamp,
   integer,
   bigint,
+  doublePrecision,
   index,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -58,6 +60,61 @@ export const players = pgTable(
   }),
 );
 
+/**
+ * Phase 1 schema: settlements / buildings / resources (AGENT.md §4.5). `last_simulated_at` on the
+ * settlement is the anchor for offline catch-up: on load we advance from it to now by formula.
+ */
+export const settlements = pgTable("settlements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  playerId: uuid("player_id")
+    .notNull()
+    .references(() => players.id, { onDelete: "cascade" })
+    .unique(),
+  gridSeed: bigint("grid_seed", { mode: "number" }).notNull(),
+  townHallLevel: integer("town_hall_level").notNull().default(1),
+  population: integer("population").notNull().default(4),
+  happiness: integer("happiness").notNull().default(100),
+  /** Anchor for offline catch-up: last time the economy was simulated for this settlement. */
+  lastSimulatedAt: timestamp("last_simulated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const buildings = pgTable(
+  "buildings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    settlementId: uuid("settlement_id")
+      .notNull()
+      .references(() => settlements.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    level: integer("level").notNull().default(1),
+    x: integer("x").notNull(),
+    y: integer("y").notNull(),
+    workers: integer("workers").notNull().default(0),
+    constructionEndsAt: timestamp("construction_ends_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    settlementIdx: index("buildings_settlement_idx").on(t.settlementId),
+  }),
+);
+
+export const resources = pgTable(
+  "resources",
+  {
+    settlementId: uuid("settlement_id")
+      .notNull()
+      .references(() => settlements.id, { onDelete: "cascade" }),
+    resourceType: text("resource_type").notNull(),
+    amount: doublePrecision("amount").notNull().default(0),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.settlementId, t.resourceType] }),
+  }),
+);
+
 export type User = typeof users.$inferSelect;
 export type World = typeof worlds.$inferSelect;
 export type Player = typeof players.$inferSelect;
+export type Settlement = typeof settlements.$inferSelect;
+export type Building = typeof buildings.$inferSelect;
+export type ResourceRow = typeof resources.$inferSelect;

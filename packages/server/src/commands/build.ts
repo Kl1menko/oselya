@@ -13,7 +13,11 @@ export function handleBuildPlace(
   now: number,
 ): void {
   const playerId = conn.identity!.playerId;
-  const settlement = ctx.settlements.getOrCreate(playerId);
+  const settlement = ctx.settlements.get(playerId);
+  if (!settlement) {
+    rejectCmd(conn, seq, "settlement_not_loaded");
+    return;
+  }
 
   const result = settlement.placeBuilding(payload.buildingType, payload.x, payload.y, now);
   if ("error" in result) {
@@ -37,7 +41,11 @@ export function handleBuildDemolish(
   now: number,
 ): void {
   const playerId = conn.identity!.playerId;
-  const settlement = ctx.settlements.getOrCreate(playerId);
+  const settlement = ctx.settlements.get(playerId);
+  if (!settlement) {
+    rejectCmd(conn, seq, "settlement_not_loaded");
+    return;
+  }
 
   const result = settlement.demolishBuilding(payload.buildingId);
   if ("error" in result) {

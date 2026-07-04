@@ -7,6 +7,7 @@ import { StatusBar } from "./ui/statusBar.js";
 import { ResourceBar } from "./ui/resourceBar.js";
 import { BuildPanel } from "./ui/buildPanel.js";
 import { BuildingPanel } from "./ui/buildingPanel.js";
+import { Toasts } from "./ui/toasts.js";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080";
 
@@ -24,6 +25,7 @@ async function boot(): Promise<void> {
   app.canvas.style.touchAction = "none";
 
   const store = new GameStore();
+  const toasts = new Toasts();
 
   const status = new StatusBar();
   const client = new WsClient(WS_URL, "dev", {
@@ -36,6 +38,7 @@ async function boot(): Promise<void> {
     },
     onDelta: (delta) => store.applyDelta(delta),
     onRejected: (r) => console.warn("command rejected:", r.reason),
+    onNotify: (n) => toasts.show(n),
   });
 
   const scene = new SettlementScene(app, store, client);

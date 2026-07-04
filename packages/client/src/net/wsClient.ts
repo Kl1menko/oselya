@@ -8,6 +8,7 @@ import {
   type SnapshotPayload,
   type DeltaPayload,
   type CmdRejectedPayload,
+  type NotifyPayload,
   type SubScope,
 } from "@oselya/shared";
 
@@ -19,6 +20,7 @@ export interface WsClientEvents {
   onSnapshot?: (snapshot: SnapshotPayload) => void;
   onDelta?: (delta: DeltaPayload) => void;
   onRejected?: (r: CmdRejectedPayload) => void;
+  onNotify?: (n: NotifyPayload) => void;
   onPong?: (rttMs: number) => void;
 }
 
@@ -110,6 +112,9 @@ export class WsClient {
         break;
       case ServerMessageType.CmdRejected:
         this.events.onRejected?.(env.d as CmdRejectedPayload);
+        break;
+      case ServerMessageType.Notify:
+        this.events.onNotify?.(env.d as NotifyPayload);
         break;
       case ServerMessageType.Pong: {
         const d = env.d as PongPayload;

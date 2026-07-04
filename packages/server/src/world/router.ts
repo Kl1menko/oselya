@@ -9,6 +9,7 @@ import {
   type CmdRejectedPayload,
   type SubScope,
   type SettlementSnapshotState,
+  type NotifyPayload,
 } from "@oselya/shared";
 import { authenticate } from "../auth/auth.js";
 import { logger } from "../logger.js";
@@ -53,7 +54,7 @@ export async function handleMessage(
       handlePing(conn, seq, d);
       return;
     case ClientMessageType.Sub:
-      if (requireAuth(conn, seq)) handleSub(conn, seq, d, ctx, now);
+      if (requireAuth(conn, seq)) await handleSub(conn, seq, d, ctx, now);
       return;
     case ClientMessageType.BuildPlace: {
       if (!requireAuth(conn, seq)) return;
@@ -113,13 +114,13 @@ function handlePing(conn: Connection, seq: number, d: unknown): void {
   conn.send<PongPayload>(ServerMessageType.Pong, seq, { ts: clientTs, serverTs: Date.now() });
 }
 
-function handleSub(
+async function handleSub(
   conn: Connection,
   seq: number,
   d: unknown,
   ctx: ServerContext,
   now: number,
-): void {
+): Promise<void> {
   const payload = clientPayloadSchemas[ClientMessageType.Sub].safeParse(d);
   if (!payload.success) {
     reject(conn, seq, "invalid_sub_payload");
@@ -129,7 +130,9 @@ function handleSub(
   conn.subscriptions.add(scope);
 
   if (scope === "settlement") {
-    const settlement = ctx.settlements.getOrCreate(conn.identity!.playerId);
+    // Load from Postgres (applies offline catch-up on first login this session).
+    const loaded = await ctx.settlements.load(conn.identity!.playerId, now);
+    const settlement = loaded.settlement;
     const state: SettlementSnapshotState = {
       settlement: settlement.toWire(now),
       terrain: settlement.toWireTerrain(),
@@ -141,6 +144,18 @@ function handleSub(
       serverTime: now,
       state,
     });
+
+    // Notify about offline progress (AGENT.md acceptance: notification on login after being away).
+    if (loaded.offlineMs > 60_000) {
+      const mins = Math.round(loaded.offlineMs / 60_000);
+      const finished = loaded.completedBuildings.length;
+      const parts = [`Поки вас не було (${mins} хв), поселення працювало.`];
+      if (finished > 0) parts.push(`Завершено будівель: ${finished}.`);
+      conn.send<NotifyPayload>(ServerMessageType.Notify, -1, {
+        level: "info",
+        text: parts.join(" "),
+      });
+    }
     return;
   }
 

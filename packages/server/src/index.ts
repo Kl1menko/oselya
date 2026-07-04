@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   // Load the world so the sim context has its seed + season epoch (AGENT.md §4.2).
   const world = await getOrCreateDevWorld();
   const ctx: ServerContext = {
-    settlements: new SettlementRegistry(world.seed),
+    settlements: new SettlementRegistry(world.seed, world.seasonStartedAt),
     seasonEpoch: world.seasonStartedAt,
   };
 
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   const connections = new Map<string, Connection>();
 
   const tickLoop = new TickLoop(ctx, connections);
-  const snapshotWriter = new SnapshotWriter();
+  const snapshotWriter = new SnapshotWriter(ctx);
 
   wss.on("connection", (ws) => {
     const conn = new Connection(randomUUID(), ws);
